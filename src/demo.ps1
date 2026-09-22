@@ -413,13 +413,17 @@ public class Sim : Overlay {
     for (int i = 0; i < n; i++) {
       var r = rows[i]; int st; double pr; State(i, out st, out pr); double prog = Prog(st, pr); var fc = Fore(st);
       var row = Off(r.Row, -Left, -Top); var pct = Off(r.Pct, -Left, -Top); var gl = Off(r.Glyph, -Left, -Top); var lb = Off(r.Label, -Left, -Top); var bar = Off(r.Bar, -Left, -Top);
-      int right = row.Right - 11;
-      // 퍼센트 칸 왼쪽부터 줄 오른쪽 안쪽까지 지우고 다시 그린다 (순번 · 제품명 · 부제는 캡처 그대로)
-      using (var b = new SolidBrush(Fill)) g.FillRectangle(b, pct.X - 6, row.Y + 2, right - (pct.X - 6), row.Height - 4);
+      int right = bar.Right; int inner0 = gl.Width + 5 + lb.Width; int chipX = gl.X - (Math.Max(86, inner0 + 20) - inner0) / 2;
+      // 바뀌는 칸만 지운다 — 퍼센트 글자 자리, 그리고 칩부터 막대 끝까지의 띠. 줄 전체를 지우면 카드 테두리와 줄 사이 배경까지 하얗게 먹는다(실기 8차 지적)
+      using (var b = new SolidBrush(Fill)) {
+        g.FillRectangle(b, pct.X - 3, pct.Y - 1, pct.Width + 6, pct.Height + 2);
+        int wy0 = Math.Min(lb.Y - 4, bar.Y - 22), wy1 = Math.Max(lb.Bottom + 4, bar.Bottom + 2);
+        g.FillRectangle(b, chipX - 2, wy0, right + 2 - (chipX - 2), wy1 - wy0);
+      }
       TextRenderer.DrawText(g, ((int)prog) + "%", fPct, pct, fc, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
       // 상태 칩: 기호 + 이름, 최소 폭 86, 모서리 11, 안쪽 여백 10,3 — 이름이 길어지면 칩이 넓어지고 오른쪽 칸이 밀린다(앱과 같다)
       var gs = TextRenderer.MeasureText(g, Glyph(st), fSmall, Size.Empty, TextFormatFlags.NoPadding); var ls = TextRenderer.MeasureText(g, StName(st), fChip, Size.Empty, TextFormatFlags.NoPadding);
-      int inner = gs.Width + 5 + ls.Width; int chipW = Math.Max(86, inner + 20); int chipH = lb.Height + 6; int chipX = gl.X - 10, chipY = lb.Y - 3;
+      int inner = gs.Width + 5 + ls.Width; int chipW = Math.Max(86, inner + 20); int chipH = lb.Height + 6; int chipY = lb.Y - 3;
       var chip = new Rectangle(chipX, chipY, chipW, chipH);
       using (var cp = Spot.Round(chip, 11)) using (var b = new SolidBrush(Back(st))) g.FillPath(b, cp);
       int ix = chipX + (chipW - inner) / 2;
@@ -661,16 +665,16 @@ function Pick([string]$product, [string]$version, [string]$lang, [string[]]$subs
   # $subs 는 1~5개 — 부족하면 앞 자막을 그대로 둔다(자막을 합친다)
   $L = Lists $script:win
   if ($subs.Count -gt 0 -and $subs[0]) { Sub $subs[0] }
-  $el = List-Item $L[0] $product; if (-not (Click-El $el "제품군 $product" (Tip 1 "제품군 선택 — $product"))) { return }; Pause 0.5
+  $el = List-Item $L[0] $product; if (-not (Click-El $el "제품군 $product" (Tip 1 "제품군 선택: $product"))) { return }; Pause 0.5
   $L = Lists $script:win
   if ($subs.Count -gt 1 -and $subs[1]) { Sub $subs[1] }
-  $el = List-Item $L[1] $version; if (-not (Click-El $el "버전 $version" (Tip 2 "버전 선택 — $version"))) { return }; Pause 0.5
+  $el = List-Item $L[1] $version; if (-not (Click-El $el "버전 $version" (Tip 2 "버전 선택: $version"))) { return }; Pause 0.5
   $L = Lists $script:win
   if ($subs.Count -gt 2 -and $subs[2]) { Sub $subs[2] }
-  $el = List-Item $L[2] $lang;    if (-not (Click-El $el "언어 $lang" (Tip 3 "언어 선택 — $lang"))) { return }; Pause 0.5
+  $el = List-Item $L[2] $lang;    if (-not (Click-El $el "언어 $lang" (Tip 3 "언어 선택: $lang"))) { return }; Pause 0.5
   $L = Lists $script:win
   if ($subs.Count -gt 3 -and $subs[3]) { Sub $subs[3] }
-  $el = List-ItemAt $L[3] 0;      if (-not (Click-El $el "설치 항목 첫째" (Tip 4 "설치 항목 확인 — 파트 수 · 무인설치 인수"))) { return }; Pause 0.9
+  $el = List-ItemAt $L[3] 0;      if (-not (Click-El $el "설치 항목 첫째" (Tip 4 "설치 항목 확인: 파트 수 · 무인설치 인수"))) { return }; Pause 0.9
   if ($subs.Count -gt 4 -and $subs[4]) { Sub $subs[4] }
   Click-El (Button-Rect-ByText $script:win '배치에 추가') '배치에 추가' (Tip 5 '배치에 추가') | Out-Null; Pause 1.1
 }
@@ -790,37 +794,37 @@ try {
 
   # 1. 제품 담기 — 첫 제품은 단계마다 짚고(①~⑤), 나머지 셋은 같은 절차를 빠르게
   Pick 'AutoCAD' '2024' '한국어' @(
-    '제품군만 고르세요 — 나머지는 프로그램이 알고 있습니다',
+    '제품군만 고르세요, 나머지는 프로그램이 알고 있습니다',
     '2020 부터 2027 까지, 원하는 버전 그대로',
-    '한국어 · 영어 · 다국어 — 언어를 헷갈릴 일이 없습니다',
+    '한국어 · 영어 · 다국어, 언어를 헷갈릴 일이 없습니다',
     '파일 몇 개짜리인지, 무인설치 인수가 무엇인지까지 미리 보여 드립니다',
-    '담기만 하세요 — 설치는 프로그램이 합니다')
-  Sub '같은 다섯 번의 클릭으로 — Revit, Revit LT, Civil 3D 도'
-  if ($guide) { $guide.Say('같은 절차예요 — 빠르게 세 개 더 담을게요') }
+    '담기만 하세요, 설치는 프로그램이 합니다')
+  Sub '같은 다섯 번의 클릭으로, Revit, Revit LT, Civil 3D 도'
+  if ($guide) { $guide.Say('같은 절차예요, 빠르게 세 개 더 담을게요') }
   Pick-Quick 'Revit' '2025' '공용'
   Pick-Quick 'Revit LT' '2021' 'English'
   Pick-Quick 'Civil 3D' '2026' 'English'
-  Sub '네 제품을 담았습니다 — 담긴 순서가 곧 설치 순서입니다'
+  Sub '네 제품을 담았습니다, 담긴 순서가 곧 설치 순서입니다'
   Snap 'picks'
   Pause 1.4
 
   # 2. 배치 순서 · 삭제 — 눈에 보이는 마지막 줄 하나로 ▲ 한 번, ▼ 한 번, ✕ 한 번 (스크롤이 튀지 않게)
-  Sub '순서 바꾸기도 클릭 한 번 — 위로, 아래로'
+  Sub '순서 바꾸기도 클릭 한 번, 위로, 아래로'
   $q = (Lists $win)[4]
-  $row = List-ItemAt $q 3; Click-El $row '배치 4번째 선택' (Tip 6 '옮길 항목 선택 — Civil 3D 2026') | Out-Null; Pause 0.6
-  Click-El (Find-Button $win '▲') '위로' (Tip 6 '▲ 위로 — 급한 제품을 앞으로') | Out-Null; Pause 1.4
-  Click-El (Find-Button $win '▼') '아래로' (Tip 6 '▼ 아래로 — 다시 뒤로') | Out-Null; Pause 1.4
-  Sub '설치 순서를 초기화하고 싶으시면 ✕ 한 번 — 목록은 그 자리에서 정리됩니다'
-  Click-El (Find-Button $win '✕') '선택 항목 삭제' (Tip 7 '✕ 선택 항목 삭제 — Civil 3D 2026 빼기') | Out-Null; Pause 1.2
+  $row = List-ItemAt $q 3; Click-El $row '배치 4번째 선택' (Tip 6 '옮길 항목 선택: Civil 3D 2026') | Out-Null; Pause 0.6
+  Click-El (Find-Button $win '▲') '위로' (Tip 6 '▲ 위로: 급한 제품을 앞으로') | Out-Null; Pause 1.4
+  Click-El (Find-Button $win '▼') '아래로' (Tip 6 '▼ 아래로: 다시 뒤로') | Out-Null; Pause 1.4
+  Sub '설치 순서를 초기화하고 싶으시면 ✕ 한 번, 목록은 그 자리에서 정리됩니다'
+  Click-El (Find-Button $win '✕') '선택 항목 삭제' (Tip 7 '✕ 선택 항목 삭제: Civil 3D 2026 빼기') | Out-Null; Pause 1.2
   Sub '세 제품, 이 순서로 설치됩니다'
   Snap 'queue'
   Pause 1.2
 
   # 3. 라이선스 유형
-  Sub '라이선스는 한 번만 — 배치 전체에 적용됩니다. 네트워크는 서버 주소만, ID 로그인은 설치 뒤 로그인만'
+  Sub '라이선스는 한 번만, 배치 전체에 적용됩니다. 네트워크는 서버 주소만, ID 로그인은 설치 뒤 로그인만'
   $net = Find-Radio $win '네트워크 라이선스'; $aid = Find-Radio $win 'Autodesk ID 로그인'
-  if ($net) { Click-El $net '네트워크 라이선스' (Tip 8 '라이선스 유형 — 네트워크 라이선스') | Out-Null; Pause 1.4 }
-  if ($aid) { Click-El $aid 'Autodesk ID 로그인' (Tip 8 '라이선스 유형 — Autodesk ID 로그인') | Out-Null; Pause 1.0 }
+  if ($net) { Click-El $net '네트워크 라이선스' (Tip 8 '라이선스 유형: 네트워크 라이선스') | Out-Null; Pause 1.4 }
+  if ($aid) { Click-El $aid 'Autodesk ID 로그인' (Tip 8 '라이선스 유형: Autodesk ID 로그인') | Out-Null; Pause 1.0 }
 
   # 4. 사양 점검 — 스크롤을 내리며 무엇을 검토하는지 알린다 → 이대로 진행 → RUN 으로 이어진다
   Sub '설치 전에, 이 PC 가 준비됐는지 먼저 봅니다'
@@ -832,29 +836,29 @@ try {
     Pause 1.2
     $hr = $hw.Current.BoundingRectangle
     Move-To ([int]($hr.X + $hr.Width * 0.3)) ([int]($hr.Y + 120)) 600
-    Sub '이 PC — CPU · 메모리 · 그래픽 · 여유 공간을 자동으로 읽습니다'; Pause 2.0
+    Sub '이 PC: CPU · 메모리 · 그래픽 · 여유 공간을 자동으로 읽습니다'; Pause 2.0
     Move-To ([int]($hr.X + $hr.Width * 0.5)) ([int]($hr.Y + 250)) 700
-    Sub '이 배치 — 내려받기 · 작업 공간 · 설치 후 용량과 예상 소요 시간까지 미리 계산합니다'; Pause 2.4
+    Sub '이 배치: 내려받기 · 작업 공간 · 설치 후 용량과 예상 소요 시간까지 미리 계산합니다'; Pause 2.4
     Move-To ([int]($hr.X + $hr.Width * 0.5)) ([int]($hr.Y + $hr.Height * 0.62)) 700
-    Sub '아래로 내리며 보겠습니다 — 항목마다 이 PC 의 값과 제품 요구 사양을 나란히, 초록 · 노랑 · 빨강으로'; Pause 1.6
+    Sub '아래로 내리며 보겠습니다, 항목마다 이 PC 의 값과 제품 요구 사양을 나란히, 초록 · 노랑 · 빨강으로'; Pause 1.6
     $wheel = [uint32]4294967176   # -120 (한 칸 아래) 의 부호 없는 표현. PS 는 0xFFFFFFFF 를 -1 로 읽어 -band 가 안 통한다
     for ($k = 1; $k -le 20; $k++) {
       [N]::mouse_event(0x0800, 0, 0, $wheel, [IntPtr]0); Pause 0.55
-      if ($k -eq 1)  { Sub '관리자 권한 · 보안 프로그램 — 설치를 막는 첫 번째 원인부터 짚습니다' }
-      if ($k -eq 5)  { Sub '운영체제 · 메모리 · 디스크 · 예상 시간 — 제품이 요구하는 값과 나란히' }
-      if ($k -eq 9)  { Sub '프로세서 · 화면 · 그래픽 — 권장 사양에 못 미치면 노랑으로 알려 줍니다' }
-      if ($k -eq 13) { Sub '설치 이력 — 이미 깔린 제품, 더 높은 버전이 있는지까지' }
-      if ($k -eq 17) { Sub 'WebView2 · .NET · Visual C++ 같은 선행조건도 미리 — 배치에 담긴 제품 전부를 봅니다' }
+      if ($k -eq 1)  { Sub '관리자 권한 · 보안 프로그램, 설치를 막는 첫 번째 원인부터 짚습니다' }
+      if ($k -eq 5)  { Sub '운영체제 · 메모리 · 디스크 · 예상 시간, 제품이 요구하는 값과 나란히' }
+      if ($k -eq 9)  { Sub '프로세서 · 화면 · 그래픽, 권장 사양에 못 미치면 노랑으로 알려 줍니다' }
+      if ($k -eq 13) { Sub '설치 이력: 이미 깔린 제품, 더 높은 버전이 있는지까지' }
+      if ($k -eq 17) { Sub 'WebView2 · .NET · Visual C++ 같은 선행조건도 미리, 배치에 담긴 제품 전부를 봅니다' }
     }
     Pause 1.0
     $only = $hw.FindFirst($TS::Descendants, (AndC (Cond $AE::ControlTypeProperty $CT::CheckBox) (Cond $AE::NameProperty '주의·실패만 보기')))
     if ($only) {
-      Sub '바쁘면 주의 · 실패 항목만 추려서 보세요 — 왜 문제인지, 어떻게 하면 되는지까지 적어 드립니다'
+      Sub '바쁘면 주의 · 실패 항목만 추려서 보세요, 왜 문제인지, 어떻게 하면 되는지까지 적어 드립니다'
       Click-El $only '주의·실패만 보기' (Tip 10 '주의 · 실패만 보기') | Out-Null; Pause 2.4
       Click-El $only '주의·실패만 보기(해제)' (Tip 10 '전체 보기') | Out-Null; Pause 0.7
     }
     Snap 'health'
-    Sub '그대로 갈지 멈출지는 사용자 선택 — 그리고 이 점검은 RUN 이 알아서 거칩니다'
+    Sub '그대로 갈지 멈출지는 사용자 선택, 그리고 이 점검은 RUN 이 알아서 거칩니다'
     Pause 1.4
     Click-El (Find-Button $hw '이대로 진행') '이대로 진행' (Tip 11 '이대로 진행') | Out-Null
     Pause 1.2
@@ -890,7 +894,7 @@ try {
       }
       if ($rowsR.Count -gt 0) {
         $qa = R2 $qr; $simRows = New-Object Sim $qa, ([SimRow[]]$rowsR), $false
-        $simRows.SampleFill(($rowsR[0].Row.Right - 14), ($rowsR[0].Row.Y + 3))
+        $simRows.SampleFill(($rowsR[0].Pct.X - 3), ($rowsR[0].Pct.Y + [int]($rowsR[0].Pct.Height / 2)))   # 퍼센트 왼쪽 여백 = 카드 안쪽 흰색
         # 상태 영역: 문구(OverallStatusText) · 퍼센트(0.0%) · 굵은 막대(높이 26) · 통계 타일(완료·실패·건너뜀·남음)
         $stT = $win.FindFirst($TS::Descendants, (Cond $AE::AutomationIdProperty 'OverallStatusText'))
         $bars = @(@($win.FindAll($TS::Descendants, (Cond $AE::ControlTypeProperty $CT::ProgressBar))) | Where-Object { -not $_.Current.BoundingRectangle.IsEmpty -and $_.Current.BoundingRectangle.Height -ge 20 })
@@ -913,20 +917,20 @@ try {
       } else { Log "!! 큐 줄을 하나도 못 읽음 — 진행 연출 생략" }
     } catch { Log "!! 시뮬레이션 준비 실패: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)"; $simRows = $null; $simSt = $null }
 
-    Sub 'RUN 한 번 — 다운로드, 압축 해제, 무인 설치가 차례로 이어집니다'
-    Click-El (Button-Rect-ByText $win 'RUN') 'RUN' (Tip 12 'RUN — 담은 순서대로 자동 설치') | Out-Null
+    Sub 'RUN 한 번, 다운로드, 압축 해제, 무인 설치가 차례로 이어집니다'
+    Click-El (Button-Rect-ByText $win 'RUN') 'RUN' (Tip 12 'RUN: 담은 순서대로 자동 설치') | Out-Null
     $mb = Find-Window '설치 전 임시파일 정리' 15 $app.Id
     if ($mb) {
-      Sub '설치 전에 임시 폴더를 비울지 묻습니다 — 앞선 설치의 찌꺼기가 실패 원인이 되지 않도록'
+      Sub '설치 전에 임시 폴더를 비울지 묻습니다, 앞선 설치의 찌꺼기가 실패 원인이 되지 않도록'
       # MessageBox 의 [예(Y)] — UIA 로 못 찾으면(실기 2026-09-22: 창은 잡혔는데 버튼이 안 나옴) 대화상자 기하로, 그래도 안 되면 키 'Y'
       $yes = @($mb.FindAll($TS::Descendants, (Cond $AE::ControlTypeProperty $CT::Button))) | Where-Object { $_.Current.Name -match '^예|^Yes' } | Select-Object -First 1
       if (-not $yes) { $yes = @($mb.FindAll($TS::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) | Where-Object { $_.Current.Name -match '^예|^Yes' } | Select-Object -First 1 }
       Pause 1.4
-      if ($yes) { Click-El $yes '예' (Tip 13 '예 — 임시 폴더 비우고 계속') | Out-Null }
+      if ($yes) { Click-El $yes '예' (Tip 13 '예: 임시 폴더 비우고 계속') | Out-Null }
       else {
         $mr = $mb.Current.BoundingRectangle; Log "  예 버튼 UIA 로 못 찾음 — 대화상자 $($mr.Width)x$($mr.Height) 기하로 누름"
         $guess = New-Object System.Windows.Rect ($mr.Right - 172), ($mr.Bottom - 35), 74, 24
-        Click-Rect $guess '예(기하)' (Tip 13 '예 — 임시 폴더 비우고 계속')
+        Click-Rect $guess '예(기하)' (Tip 13 '예: 임시 폴더 비우고 계속')
         Pause 1.0
       }
     }
@@ -937,13 +941,13 @@ try {
       $sw = [System.Diagnostics.Stopwatch]::StartNew(); $dur = $simRows.Total; $said = @{}
       while ($sw.Elapsed.TotalSeconds -lt $dur + 2.5) {
         $tt = $sw.Elapsed.TotalSeconds; $simRows.Set($tt); if ($simSt) { $simSt.Set($tt) }
-        if ($tt -ge 0.3 -and -not $said[1]) { $said[1] = 1; Sub '받아 둔 파일은 다시 받지 않습니다 — 캐시를 그대로 씁니다'; if ($script:guide) { $script:guide.Say('내려받기는 캐시로 바로!') } }
-        if ($tt -ge 2.0 -and -not $said[2]) { $said[2] = 1; Sub '압축 해제 확인 창이 떠도 프로그램이 대신 누릅니다 — 사람이 지킬 필요가 없습니다'; if ($script:guide) { $script:guide.Say('확인 창은 제가 누를게요!') } }
-        if ($tt -ge 5.2 -and -not $said[3]) { $said[3] = 1; Sub '무인 설치 — 진행률 · 남은 시간 · 실행 로그가 한 화면에'; if ($script:guide) { $script:guide.Say('지켜보기만 하세요') } }
-        if ($tt -ge 9.8 -and -not $said[4]) { $said[4] = 1; Sub '첫 제품 완료 → 곧바로 다음 제품으로 — 사람이 클릭할 필요가 없습니다'; if ($script:guide) { $script:guide.Say('하나 끝! 다음 제품은 제가 알아서 이어갈게요') } }
-        if ($tt -ge 15.0 -and -not $said[5]) { $said[5] = 1; Sub '하나가 끝나면 다음이 자동으로 — 라이선스까지 맞추고 이어갑니다'; if ($script:guide) { $script:guide.Say('클릭 없이 연속 설치!') } }
-        if ($tt -ge 20.5 -and -not $said[7]) { $said[7] = 1; Sub '세 번째도 사람 손 없이 — 자리를 비워도 설치는 계속됩니다' }
-        if ($tt -ge $dur - 0.5 -and -not $said[6]) { $said[6] = 1; Sub '세 제품 설치 완료 — RUN 한 번 뒤엔 클릭 한 번도 없었습니다'; if ($script:guide) { $script:guide.Say('전부 끝났어요!') } }
+        if ($tt -ge 0.3 -and -not $said[1]) { $said[1] = 1; Sub '받아 둔 파일은 다시 받지 않습니다, 캐시를 그대로 씁니다'; if ($script:guide) { $script:guide.Say('내려받기는 캐시로 바로!') } }
+        if ($tt -ge 2.0 -and -not $said[2]) { $said[2] = 1; Sub '압축 해제 확인 창이 떠도 프로그램이 대신 누릅니다, 사람이 지킬 필요가 없습니다'; if ($script:guide) { $script:guide.Say('확인 창은 제가 누를게요!') } }
+        if ($tt -ge 5.2 -and -not $said[3]) { $said[3] = 1; Sub '무인 설치: 진행률 · 남은 시간 · 실행 로그가 한 화면에'; if ($script:guide) { $script:guide.Say('지켜보기만 하세요') } }
+        if ($tt -ge 9.8 -and -not $said[4]) { $said[4] = 1; Sub '첫 제품 완료 → 곧바로 다음 제품으로, 사람이 클릭할 필요가 없습니다'; if ($script:guide) { $script:guide.Say('하나 끝! 다음 제품은 제가 알아서 이어갈게요') } }
+        if ($tt -ge 15.0 -and -not $said[5]) { $said[5] = 1; Sub '하나가 끝나면 다음이 자동으로, 라이선스까지 맞추고 이어갑니다'; if ($script:guide) { $script:guide.Say('클릭 없이 연속 설치!') } }
+        if ($tt -ge 20.5 -and -not $said[7]) { $said[7] = 1; Sub '세 번째도 사람 손 없이, 자리를 비워도 설치는 계속됩니다' }
+        if ($tt -ge $dur - 0.5 -and -not $said[6]) { $said[6] = 1; Sub '세 제품 설치 완료, RUN 한 번 뒤엔 클릭 한 번도 없었습니다'; if ($script:guide) { $script:guide.Say('전부 끝났어요!') } }
         if ($tt -ge 7.0 -and -not $said[91]) { $said[91] = 1; Snap 'sim07' }
         if ($tt -ge 22.0 -and -not $said[92]) { $said[92] = 1; Snap 'sim22' }
         if ($tt -ge $dur -and -not $said[93]) { $said[93] = 1; Snap 'sim_end' }
