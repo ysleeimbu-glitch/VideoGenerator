@@ -131,7 +131,8 @@ public class Intro : Overlay {
        fSmall = new Font("Malgun Gothic", 22f, FontStyle.Bold), fWord = new Font("Malgun Gothic", 24f, FontStyle.Bold);
   Image[] flips;
   public Intro(Image[] imgs, string[] words, string[] lines) {
-    this.imgs = imgs; this.words = words; this.lines = lines; BackColor = Color.Black; Bounds = Screen.PrimaryScreen.Bounds;
+    this.imgs = new Image[imgs.Length]; for (int i = 0; i < imgs.Length; i++) this.imgs[i] = Prescale(imgs[i], i == 0 ? 600 : 460); imgs = this.imgs;
+    this.words = words; this.lines = lines; BackColor = Color.Black; Bounds = Screen.PrimaryScreen.Bounds;
     SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
     flips = new Image[imgs.Length];
     for (int i = 0; i < imgs.Length; i++) { var f = (Image)imgs[i].Clone(); f.RotateFlip(RotateFlipType.RotateNoneFlipY); flips[i] = f; }
@@ -163,10 +164,15 @@ public class Intro : Overlay {
   }
   public static void DrawFit(Graphics g, Image im, float cx, float cy, float w, float alpha) {
     if (im == null || alpha <= 0) return; if (alpha > 1) alpha = 1; float h = w * im.Height / im.Width;
+    var dst = new Rectangle((int)(cx - w / 2), (int)(cy - h / 2), (int)w, (int)h);
+    if (alpha >= 0.995f) { g.DrawImage(im, dst, 0, 0, im.Width, im.Height, GraphicsUnit.Pixel); return; }   // 알파 행렬은 픽셀마다 곱해 느리다 — 불투명이면 건너뛴다
     using (var ia = new System.Drawing.Imaging.ImageAttributes()) { var cm = new System.Drawing.Imaging.ColorMatrix(); cm.Matrix33 = alpha; ia.SetColorMatrix(cm);
-      g.DrawImage(im, new Rectangle((int)(cx - w / 2), (int)(cy - h / 2), (int)w, (int)h), 0, 0, im.Width, im.Height, GraphicsUnit.Pixel, ia); }
+      g.DrawImage(im, dst, 0, 0, im.Width, im.Height, GraphicsUnit.Pixel, ia); }
   }
   public static Image Logo, Badge;   // 상상진화 로고 · Autodesk Gold Partner (흰색판) — 스크립트가 넣어 준다
+  // 그리는 크기의 두 배쯤으로 미리 줄여 둔다 — 고해상도 원본(640~2000px)을 매 프레임 줄여 그리면 프레임이 떨어진다(실측: 엔딩 200ms → 32ms)
+  public static Bitmap Prescale(Image src, int w) { if (src.Width <= w) return new Bitmap(src); int h = (int)Math.Round((double)src.Height * w / src.Width); var b = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+    using (var g = Graphics.FromImage(b)) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.PixelOffsetMode = PixelOffsetMode.HighQuality; g.DrawImage(src, 0, 0, w, h); } return b; }
   public static void DrawShadow(Graphics g, float cx, float cy, float w, float h, float alpha) {
     if (alpha <= 0) return; if (alpha > 1) alpha = 1;
     using (var p = new GraphicsPath()) {
@@ -204,9 +210,10 @@ public class Intro : Overlay {
   static double Back(double x) { if (x <= 0) return 0; if (x >= 1) return 1; double c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.Pow(x - 1, 3) + c1 * Math.Pow(x - 1, 2); }
   public static void DrawImg(Graphics g, Image im, float cx, float cy, float size, float alpha) {
     if (alpha <= 0 || size <= 2) return; if (alpha > 1) alpha = 1;
+    var r = new Rectangle((int)(cx - size / 2), (int)(cy - size / 2), (int)size, (int)size);
+    if (alpha >= 0.995f) { g.DrawImage(im, r, 0, 0, im.Width, im.Height, GraphicsUnit.Pixel); return; }
     using (var ia = new System.Drawing.Imaging.ImageAttributes()) {
       var cm = new System.Drawing.Imaging.ColorMatrix(); cm.Matrix33 = alpha; ia.SetColorMatrix(cm);
-      var r = new Rectangle((int)(cx - size / 2), (int)(cy - size / 2), (int)size, (int)size);
       g.DrawImage(im, r, 0, 0, im.Width, im.Height, GraphicsUnit.Pixel, ia);
     }
   }
@@ -233,7 +240,7 @@ public class Intro : Overlay {
   }
   protected override void OnPaint(PaintEventArgs e) {
     var g = e.Graphics; Bg.Paint(g, Bounds);
-    g.SmoothingMode = SmoothingMode.AntiAlias; g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+    g.SmoothingMode = SmoothingMode.AntiAlias; g.InterpolationMode = InterpolationMode.HighQualityBilinear;
     g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
     // A. 도시 장면이 왼쪽에 서서히 — 살짝 떠서 흔들리고, 바닥 빛 + 반사로 입체감
     double a = Ease(t / 1.6); float sceneSize = (float)(500 + 60 * a); float sx = (float)(410 + 8 * Math.Sin(t * 0.7)), sy = (float)(395 + 6 * Math.Sin(t * 1.1));
@@ -279,8 +286,8 @@ public class Guide : Overlay {
   Font f = new Font("Malgun Gothic", 16f, FontStyle.Bold);
   const float SIZE = 270f; const float MX = 158f, MY = 152f;   // 그림(320px) 안의 입 위치
   public Guide(Image im) {
-    this.im = im; flip = (Image)im.Clone(); flip.RotateFlip(RotateFlipType.RotateNoneFlipY);
-    try { var bm = im as Bitmap; skin = bm != null ? bm.GetPixel((int)MX, (int)(MY - 16)) : Color.FromArgb(250, 240, 235); if (skin.A < 200) skin = Color.FromArgb(250, 240, 235); } catch { skin = Color.FromArgb(250, 240, 235); }
+    this.im = im = Intro.Prescale(im, 540); flip = (Image)im.Clone(); flip.RotateFlip(RotateFlipType.RotateNoneFlipY);
+    try { var bm = im as Bitmap; float k = bm.Width / 320f; skin = bm != null ? bm.GetPixel((int)(MX * k), (int)((MY - 16) * k)) : Color.FromArgb(250, 240, 235); if (skin.A < 200) skin = Color.FromArgb(250, 240, 235); } catch { skin = Color.FromArgb(250, 240, 235); }
     BackColor = Color.Black; Bounds = new Rectangle(20, 180, 540, 790);
     SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
   }
@@ -497,15 +504,30 @@ public class Caption : Overlay {
 // 엔딩(약 5초) — 상상진화 로고를 가운데 두고 3D 느낌으로: 두께(어두운 판을 겹쳐 밀어냄) · 옆으로 돌며 등장 ·
 // 빛줄기가 로고 획 위만 훑고 지나감 · 바닥 빛 웅덩이와 반사 · 별빛 입자. 끝은 검정으로 잠긴다.
 public class Outro : Overlay {
-  double t, dur; Image logo, flip, dark, white, badge; string[] lines; float[] px = new float[70], py = new float[70], ps = new float[70], pp = new float[70];
+  double t, dur; Image logo, flip, white, badge; Bitmap extr; string[] lines; float[] px = new float[70], py = new float[70], ps = new float[70], pp = new float[70];
   Font fLine = new Font("Malgun Gothic", 30f, FontStyle.Bold), fSmall = new Font("Malgun Gothic", 20f, FontStyle.Bold);
   public string Twinkle; static readonly double[] cues = { 0.5, 1.7, 2.6 };
   public Outro(Image logo, Image badge, string[] lines) {
     this.logo = logo; this.badge = badge; this.lines = lines; BackColor = Color.Black; Bounds = Screen.PrimaryScreen.Bounds;
     SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
-    if (logo != null) { flip = (Image)logo.Clone(); flip.RotateFlip(RotateFlipType.RotateNoneFlipY); dark = Tint(logo, Color.FromArgb(14, 26, 56)); white = Tint(logo, Color.White); }
+    if (logo != null) {
+      // 그리는 폭(760)으로 미리 줄인다 — 매 프레임 2000px 원본을 14번 줄여 그리면 5fps 가 된다(실측 200~270ms/프레임)
+      this.logo = logo = Prescale(logo, 760);
+      flip = (Image)logo.Clone(); flip.RotateFlip(RotateFlipType.RotateNoneFlipY); white = Tint(logo, Color.White);
+      var dark = Tint(logo, Color.FromArgb(14, 26, 56));
+      // 두께 판 12장을 한 장으로 합쳐 둔다(오른쪽 아래로 1.1px 씩)
+      extr = new Bitmap(logo.Width + 16, logo.Height + 16, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+      using (var g = Graphics.FromImage(extr)) { g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+        for (int k = 12; k >= 1; k--) DrawFitAt(g, dark, k * 1.1f, k * 1.1f, logo.Width, 0.55f + 0.45f * k / 12f); }
+      dark.Dispose();
+    }
     var rnd = new Random(3); for (int i = 0; i < px.Length; i++) { px[i] = (float)(rnd.NextDouble() * 1920); py[i] = (float)(rnd.NextDouble() * 1080); ps[i] = (float)(1.5 + rnd.NextDouble() * 3); pp[i] = (float)(rnd.NextDouble() * 6.28); }
   }
+  static Bitmap Prescale(Image src, int w) { return Intro.Prescale(src, w); }
+  // 합친 두께 판을 만들 때 쓴다 — 왼쪽 위 원점 기준
+  static void DrawFitAt(Graphics g, Image im, float x, float y, float w, float alpha) {
+    float h = w * im.Height / im.Width; using (var ia = new System.Drawing.Imaging.ImageAttributes()) { var cm = new System.Drawing.Imaging.ColorMatrix(); cm.Matrix33 = alpha; ia.SetColorMatrix(cm);
+      g.DrawImage(im, new Rectangle((int)x, (int)y, (int)w, (int)h), 0, 0, im.Width, im.Height, GraphicsUnit.Pixel, ia); } }
   // 원본의 알파는 두고 색만 한 가지로 — 두께 판(어두운색) · 빛줄기(흰색)에 쓴다
   public static Bitmap Tint(Image src, Color c) {
     var b = new Bitmap(src.Width, src.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
@@ -529,7 +551,7 @@ public class Outro : Overlay {
   public void RenderFrame(double tt, double d, string path) { t = tt; dur = d; using (var b = new Bitmap(Width, Height)) { DrawToBitmap(b, ClientRectangle); b.Save(path); } }
   protected override void OnPaint(PaintEventArgs e) {
     var g = e.Graphics; Bg.Paint(g, Bounds);
-    g.SmoothingMode = SmoothingMode.AntiAlias; g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+    g.SmoothingMode = SmoothingMode.AntiAlias; g.InterpolationMode = InterpolationMode.HighQualityBilinear; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
     // 별빛 입자 — 천천히 떠오르며 깜빡인다
     for (int i = 0; i < px.Length; i++) {
       float y = (py[i] - (float)(t * 18 * ps[i]) % 1080 + 1080) % 1080; double tw = 0.5 + 0.5 * Math.Sin(t * 3 + pp[i]);
@@ -542,7 +564,7 @@ public class Outro : Overlay {
       float sx = (float)Math.Max(0.02, a); float tilt = (float)(-(1 - Math.Min(1, a)) * 22 + 2.5 * Math.Sin(t * 0.9));
       var st = g.Save(); g.TranslateTransform(cx, cy); g.RotateTransform(tilt); g.ScaleTransform(sx, 1f);
       // 두께: 어두운 판을 오른쪽 아래로 밀어 겹친다 → 글자에 두께가 생긴다
-      for (int k = 12; k >= 1; k--) Intro.DrawFit(g, dark, k * 1.1f, k * 1.1f, w, (float)al * (0.55f + 0.45f * k / 12f));
+      Intro.DrawFit(g, extr, 8, 8, extr.Width, (float)al);   // 합쳐 둔 두께 판 한 장(원점 보정: 판이 로고보다 16px 크고 왼쪽 위 정렬)
       Intro.DrawFit(g, logo, 0, 0, w, (float)al);
       // 빛줄기: 로고 획 위만 흰 띠가 왼쪽에서 오른쪽으로 훑는다(t 1.4~2.4), 뒤에 한 번 더 약하게
       double s1 = (t - 1.4) / 1.0, s2 = (t - 3.6) / 1.0; double s = s1 >= 0 && s1 <= 1 ? s1 : (s2 >= 0 && s2 <= 1 ? s2 : -1);
@@ -765,14 +787,18 @@ $cur  = New-Object CursorFx   # 큰 붉은 커서(형광 후광) — Tick 마다
 $charDir = 'C:\Users\info\Downloads\캐릭터'
 $guide = $null; $intro = $null; $outro = $null
 try {
-  $imgs = @('다운로드1.jpg','다운로드4.jpg','다운로드5.jpg','다운로드6.jpg','다운로드7.jpg') | ForEach-Object { $raw = [System.Drawing.Image]::FromFile((Join-Path $charDir $_)); $k = [Intro]::KeyBlack($raw); $raw.Dispose(); $k }
+  # hd\ 에 Real-ESRGAN 으로 올린 640px 판이 있으면 그것을 쓴다(JPEG 잡음이 없다). 없으면 원본 JPG
+  $hdDir = Join-Path $charDir 'hd'; $hdUsed = 0
+  $imgs = @('다운로드1','다운로드4','다운로드5','다운로드6','다운로드7') | ForEach-Object { $hp = Join-Path $hdDir "$_.png"; $path = $(if (Test-Path $hp) { $hdUsed++; $hp } else { Join-Path $charDir "$_.jpg" }); $raw = [System.Drawing.Image]::FromFile($path); $k = [Intro]::KeyBlack($raw); $raw.Dispose(); $k }
+  Log "캐릭터 고해상도 판 $hdUsed/5"
   $intro = New-Object Intro ([System.Drawing.Image[]]$imgs), ([string[]]@('고르고', '담고', '점검하고', 'RUN!')), ([string[]]@('13개 제품군 · 151개 설치본을 DB 로', '2020 ~ 2027 · 한국어 · 영어 · 다국어 매체', '사양 점검 → 다운로드 → 압축 해제 → 무인 설치 → 라이선스'))
   if (Test-Path "$root\twinkle.wav") { $intro.Twinkle = "$root\twinkle.wav" }
   $guide = New-Object Guide ($imgs[4])   # 다운로드7 — 청록 헬멧 · 안경
   Log "캐릭터 $($imgs.Count)장 읽음"
   # 로고 — 상상진화(SVG 를 Edge 헤드리스로 미리 PNG 로 만든 것) · Autodesk Gold Partner(검정→흰색판)
   if (Test-Path "$root\logo_ssjh.png") { [Intro]::Logo = [System.Drawing.Image]::FromFile("$root\logo_ssjh.png"); Log "상상진화 로고" }
-  if (Test-Path "$charDir\autodesk gold partner logo.png") { $rawB = [System.Drawing.Image]::FromFile("$charDir\autodesk gold partner logo.png"); [Intro]::Badge = [Intro]::WhiteFromDark($rawB); $rawB.Dispose(); Log "Gold Partner 로고" }
+  $badgePath = $(if (Test-Path "$hdDir\autodesk gold partner logo.png") { "$hdDir\autodesk gold partner logo.png" } else { "$charDir\autodesk gold partner logo.png" })
+  if (Test-Path $badgePath) { $rawB = [System.Drawing.Image]::FromFile($badgePath); [Intro]::Badge = [Intro]::WhiteFromDark($rawB); $rawB.Dispose(); Log "Gold Partner 로고" }
   # 엔딩 — 상상진화 로고 중심. 로고가 없으면 건너뛴다
   if ([Intro]::Logo) { $outro = New-Object Outro ([Intro]::Logo), ([Intro]::Badge), ([string[]]@('설치는 프로그램에게, 시간은 사람에게', '(주)상상진화  ·  Autodesk Gold Partner')); if (Test-Path "$root\twinkle.wav") { $outro.Twinkle = "$root\twinkle.wav" }; Log "엔딩 준비" }
 } catch { Log "캐릭터 못 읽음: $($_.Exception.Message)" }
