@@ -14,7 +14,7 @@ description: "Autodesk 설치 자동화" 홍보 영상을 앱을 실제로 조�
 |---|---|---|
 | 앱 | `Autodesk 설치 자동화` 가 설치돼 있어야 한다 | `requireAdministrator` 라 **스크립트도 승격**해야 조작된다(UIPI) |
 | OBS Studio 32 + obs-websocket | 기본 설치 | `%APPDATA%\obs-studio\plugin_config\obs-websocket\config.json` 의 `server_enabled` 를 스크립트가 켠다 |
-| 캐릭터 그림 | `assets/characters/` → 실행 PC 의 `C:\Users\<user>\Downloads\캐릭터\` | 스크립트가 그 경로를 본다(`$charDir`) |
+| 캐릭터 그림 | `assets/characters/`(원본 JPG) → 실행 PC 의 `C:Users<user>Downloads캐릭터`, **`assets/work/`(AI 업스케일 640px PNG) → 그 아래 `hd`** | `hd` 가 있으면 우선 읽는다. 8K 원본은 `assets/hires/`(보관용, 영상엔 안 쓴다 — 프레임이 떨어진다) |
 | 로고 | `assets/logos/` — `logo_ssjh.png`, `autodesk gold partner logo.png` | `logo_ssjh.png` 는 SVG 를 Edge 헤드리스로 뽑은 것(아래) |
 | 소리 | `assets/audio/twinkle.wav` · `bgm.wav`(생성) | `bgm.wav` 는 52 MB 라 git 에 안 넣는다 — `make-bgm.ps1` 로 만든다 |
 
@@ -99,5 +99,11 @@ demo.ps1 -Test                비승격 시험: RUN 을 생략하고 snap_*.png 
 
 1. 장면 하나를 바꾸면 **오프스크린으로 먼저 본다** — `Intro/Outro.RenderFrame(t, dur, path)`, `Sim` 은 옛 캡처 위에 그려 본다(`Sim(area, rows, status, Bitmap)`).
 2. `-NoObs -SnapAll` 로 한 번 돌려 `snap_sim*.png` 와 `demo-transcript.txt` 를 본다. `!!` 0건이어야 한다.
-3. 그다음 `demo.cmd` 로 본판을 찍는다. 찍은 뒤 MP4 에서 프레임을 뽑아 본다(WPF `MediaPlayer` STA + 디스패처 펌프).
+3. 그다음 `demo.cmd` 로 본판을 찍는다. 찍은 뒤 `tools/serve.ps1` 로 Videos 폴더를 http 로 내놓고 브라우저 `<video>` 의 `currentTime` 을 옮겨 인트로(8초)·연출(150초)·엔딩(178초)을 본다. WPF `MediaPlayer` 추출은 탐색이 안 먹는다 — 쓰지 않는다.
 4. `devlog.md` 에 무엇을 왜 바꿨는지 적는다. 근거(로그 시각·캡처 파일)를 함께.
+
+## 8K 자료
+
+`tools/get-realesrgan.ps1`(43 MB 받기) → `tools/upscale-8k.ps1`. 마스코트는 `x4plus-anime` ×4 → `animevideov3-x3` → `animevideov3-x2` = 7680px,
+배지는 `x4plus` ×4 ×4, 로고는 SVG 라 Edge 헤드리스로 8K 직접 렌더. 결과는 `assets/hires/`, 영상용 작업본(640px · 로고 2000px)은 `assets/work/`.
+**8K 를 영상에 그대로 쓰지 않는다** — 엔딩이 2000px 로고를 프레임마다 14번 줄여 그리면 4fps 다. `Intro.Prescale` 로 그리는 크기의 두 배로 미리 줄인다.

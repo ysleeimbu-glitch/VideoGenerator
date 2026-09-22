@@ -894,7 +894,7 @@ try {
   if (-not $Test) {
     # RUN 직전에 큐 줄과 상태 영역의 자리를 재고 화면을 떠 둔다 — 시뮬레이션은 이 그림 위에 진행값만 바꿔 그린다.
     # 실기 6차(2026-09-22)에서 제목이 '1 2 3' 으로 바뀌고(순번 글자를 제목으로 읽음) 막대가 제자리를 벗어난 것을 고친 판.
-    $script:tip.HideAll(); Move-To 1500 1010 300; Pause 0.5
+    $script:tip.HideAll(); Move-To 300 100 300; Pause 0.5
     $simRows = $null; $simSt = $null; $rowsR = @()
     try {
       $q = (Lists $win)[4]
@@ -960,7 +960,7 @@ try {
         Pause 1.0
       }
     }
-    $script:tip.HideAll(); Move-To 1500 1010 350   # 붉은 커서가 목록 위에 머물지 않게
+    $script:tip.HideAll(); Move-To 300 100 350   # 붉은 커서를 빈 곳(왼쪽 위 남색 배경)에 둔다 — 자막 바 위에 두면 글자를 가린다(본판 1차 지적)
     # 진행 — 실제 배치는 뒤에서 도는 채로, 앞에 떠 둔 그림 위에서 줄 셋이 빠르게 완료까지 간다(약 50초). 영상용 연출이다.
     if ($simRows) {
       Log "시뮬레이션 줄 $($rowsR.Count) · 제목 $(@($rowsR | ForEach-Object { $_.Title }) -join ' | ')"
