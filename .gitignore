@@ -4,3 +4,5 @@ demo-transcript.txt
 *.mp4.tmp
 # 실행 중 임시 캡처는 previews/ 로 골라서 넣는다
 src/snap_*.png
+# Real-ESRGAN 이진(51 MB) — tools/get-realesrgan.ps1 로 받는다
+tools/realesrgan/
