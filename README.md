@@ -8,7 +8,9 @@
 | `src/` | `demo.ps1`(본체) · `obs.ps1`(obs-websocket v5) · `make-bgm.ps1` · `make-sfx.ps1` · `demo.cmd`(승격 실행) |
 | `assets/` | 캐릭터 그림 · 로고(SVG/PNG) · 효과음. 배경음악 `bgm.wav` 는 52 MB 라 `make-bgm.ps1` 로 만든다 |
 | `previews/` | 오프스크린 렌더와 실행 중 캡처 — 인트로 · 엔딩 · 진행 연출 · 화면 |
-| `output/` | 완성 영상(본판 녹화 뒤) |
+| `output/` | 완성 영상 + 실행 로그 |
+| `tools/` | `upscale-8k.ps1`(Real-ESRGAN 8K 업스케일) · `get-realesrgan.ps1` · `serve.ps1`(영상 확인용 http) |
+| [CLAUDE.md](CLAUDE.md) | 이 저장소에서 작업할 때의 규칙 — 커밋, 실행, 업스케일, 자막 결정 |
 | [SKILL.md](SKILL.md) | 다시 찍거나 고칠 때 읽는 방법 · 당했던 것 목록 |
 | [devlog.md](devlog.md) | 무엇을 왜 바꿨는지, 회차별 결과 |
 

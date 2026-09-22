@@ -102,8 +102,41 @@ demo.ps1 -Test                비승격 시험: RUN 을 생략하고 snap_*.png 
 3. 그다음 `demo.cmd` 로 본판을 찍는다. 찍은 뒤 `tools/serve.ps1` 로 Videos 폴더를 http 로 내놓고 브라우저 `<video>` 의 `currentTime` 을 옮겨 인트로(8초)·연출(150초)·엔딩(178초)을 본다. WPF `MediaPlayer` 추출은 탐색이 안 먹는다 — 쓰지 않는다.
 4. `devlog.md` 에 무엇을 왜 바꿨는지 적는다. 근거(로그 시각·캡처 파일)를 함께.
 
-## 8K 자료
+## 업스케일 (8K 자료)
 
-`tools/get-realesrgan.ps1`(43 MB 받기) → `tools/upscale-8k.ps1`. 마스코트는 `x4plus-anime` ×4 → `animevideov3-x3` → `animevideov3-x2` = 7680px,
-배지는 `x4plus` ×4 ×4, 로고는 SVG 라 Edge 헤드리스로 8K 직접 렌더. 결과는 `assets/hires/`, 영상용 작업본(640px · 로고 2000px)은 `assets/work/`.
-**8K 를 영상에 그대로 쓰지 않는다** — 엔딩이 2000px 로고를 프레임마다 14번 줄여 그리면 4fps 다. `Intro.Prescale` 로 그리는 크기의 두 배로 미리 줄인다.
+모든 그림 자료는 **8K 급 원본**을 `assets/hires/` 에 두고, 영상은 거기서 줄인 **작업본**(`assets/work/`)을 쓴다.
+원본이 작은 그림(마스코트 320px JPG)은 단순 확대가 아니라 **Real-ESRGAN(ncnn-vulkan, GPU)** 으로 올린다 — 잡음이 빠지고 선이 산다.
+
+```powershell
+powershell -File tools\get-realesrgan.ps1                       # 처음 한 번: 43 MB 휴대판을 tools\realesrgan\ 에 푼다 (git 제외)
+powershell -File tools\upscale-8k.ps1                           # 캐릭터 폴더 전체 → assets\hires\*_8k.png + assets\work\*.png
+powershell -File tools\upscale-8k.ps1 -Src D:\new -Kind photo   # 사진·로고 글자는 photo (일반 모델)
+powershell -File tools\upscale-8k.ps1 -Include 'mascot9.*' -Force   # 한 장만 다시
+```
+
+| 인수 | 뜻 | 기본 |
+|---|---|---|
+| `-Src` · `-Include` | 원본 폴더 · 이름 패턴 | `Downloads\캐릭터` · `*.jpg,*.jpeg,*.png` |
+| `-Kind anime/photo` | 첫 통과 모델. 일러스트·마스코트는 `anime`(`x4plus-anime`), 사진·글자 로고는 `photo`(`x4plus`) | `anime` |
+| `-Target` | 긴 변이 이 값 이상이 될 때까지 통과 | 7680 |
+| `-WorkWidth` | 작업본 폭. 영상에서 그리는 크기의 **두 배쯤** | 640 (마스코트) · 배지는 1108 |
+| `-Out` · `-Work` · `-Force` | 8K 자리 · 작업본 자리 · 있어도 다시 | `assets/hires` · `assets/work` |
+
+**통과 계획**: 첫 통과는 언제나 ×4(잡음 정리가 가장 좋다). 그 뒤는 {2,3,4} 를 최대 세 번 곱해 필요한 배수를 넘기되 **가장 작게** 고른다 —
+320 → 1280 뒤 6배가 필요하면 ×2·×3 = 7680 딱 맞춤(×4·×2 는 10240 으로 파일만 커진다). 554px 배지는 ×4·×4 = 8864.
+실측(GTX 1660 SUPER): 마스코트 한 장 7~10초, 배지 46초(8864² 는 타일이 많다).
+
+**SVG 는 업스케일하지 않는다** — 벡터라 Edge 헤드리스로 원하는 크기를 바로 뽑는다:
+```powershell
+& "$env:ProgramFiles(x86)\Microsoft\Edge\Application\msedge.exe" --headless=new --disable-gpu --hide-scrollbars --screenshot=out.png --window-size=7680,2266 --default-background-color=00000000 "file:///.../logo.html"
+```
+(`logo.html` 은 `<img src="…svg" style="width:7680px;height:2266px">` 한 줄. `--screenshot` 에 SVG 를 직접 주면 크기가 안 맞는다.)
+
+**영상에는 8K 를 그대로 쓰지 않는다.** 실측: 엔딩이 2000px 로고를 프레임마다 14번 줄여 그리면 266ms/프레임(≈4fps), 1400px 도 202ms 였다.
+- 스크립트는 `캐릭터\hd\` 에 작업본이 있으면 우선 읽는다(`캐릭터 고해상도 판 5/5` 로그). 없으면 원본 JPG.
+- `Intro.Prescale(img, w)` 로 **그리는 크기의 두 배**로 미리 줄인다: 장면 600 · 마스코트 460 · 안내 캐릭터 540 · 엔딩 로고 760.
+- 엔딩 두께 판 12장은 생성 때 한 장으로 합친다. `DrawFit/DrawImg` 는 알파 1 이면 `ImageAttributes` 를 건너뛴다(픽셀마다 행렬 곱이라 느리다).
+- 실측 후: 엔딩 32ms · 인트로 57ms · 안내 9ms(오프스크린 `DrawToBitmap` 기준, 화면은 더 빠르다).
+- 그림 안 좌표(안내 캐릭터 입 위치 `MX,MY`)는 **320px 기준**이다 — 다른 크기 판을 쓰면 `bm.Width/320` 으로 비례해 잰다. 640 판에서 피부색 표본이 헬멧을 집은 적이 있다.
+
+**새 그림을 넣을 때**: 원본을 `assets/characters/`(또는 `logos/`)에 두고 → `upscale-8k.ps1` → `assets/work/*.png` 를 실행 PC 의 `캐릭터\hd\` 로 복사 → 오프스크린 렌더로 확인(`RenderFrame`) → 프레임 비용을 잰다(위 실측과 비교) → `-NoObs -SnapAll` 한 번.
