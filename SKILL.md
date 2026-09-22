@@ -14,7 +14,7 @@ description: "Autodesk 설치 자동화" 홍보 영상을 앱을 실제로 조�
 |---|---|---|
 | 앱 | `Autodesk 설치 자동화` 가 설치돼 있어야 한다 | `requireAdministrator` 라 **스크립트도 승격**해야 조작된다(UIPI) |
 | OBS Studio 32 + obs-websocket | 기본 설치 | `%APPDATA%\obs-studio\plugin_config\obs-websocket\config.json` 의 `server_enabled` 를 스크립트가 켠다 |
-| 캐릭터 그림 | `assets/characters/`(원본 JPG) → 실행 PC 의 `C:Users<user>Downloads캐릭터`, **`assets/work/`(AI 업스케일 640px PNG) → 그 아래 `hd`** | `hd` 가 있으면 우선 읽는다. 8K 원본은 `assets/hires/`(보관용, 영상엔 안 쓴다 — 프레임이 떨어진다) |
+| 캐릭터 그림 | `assets/characters/`(원본 JPG) → 실행 PC 의 `C:\Users\<user>\Downloads\캐릭터\`, **`assets/work/`(AI 업스케일 640px PNG) → 그 아래 `hd\`** | `hd\` 가 있으면 우선 읽는다. 8K 원본은 `assets/hires/`(보관용, 영상엔 안 쓴다 — 프레임이 떨어진다) |
 | 로고 | `assets/logos/` — `logo_ssjh.png`, `autodesk gold partner logo.png` | `logo_ssjh.png` 는 SVG 를 Edge 헤드리스로 뽑은 것(아래) |
 | 소리 | `assets/audio/twinkle.wav` · `bgm.wav`(생성) | `bgm.wav` 는 52 MB 라 git 에 안 넣는다 — `make-bgm.ps1` 로 만든다 |
 
